@@ -1,0 +1,285 @@
+#!/bin/sh
+#
+# This file is in the public domain.
+#
+# For more information email LoranceStinson+csv@gmail.com.
+# Or see http://lorance.freeshell.org/csvutils/
+
+#**************************************************************************
+# Defaults.
+#**************************************************************************
+CSV_ESCAPE=${CSV_ESCAPE:='"'}
+CSV_SEPARATOR=${CSV_SEPARATOR:=","}
+CSV_QUOTE=${CSV_QUOTE:='"'}
+OCSV_ESCAPE=${CSV_ESCAPE:='"'}
+OCSV_SEPARATOR=${CSV_SEPARATOR:=","}
+OCSV_QUOTE=${CSV_QUOTE:='"'}
+FILE="-"
+NL_TEXT=""
+NUM_COLS=""
+OUTPUT=""
+QUOTE_LEVEL="0"
+SKIP_ROWS="0"
+TAB_TEXT=""
+
+#**************************************************************************
+# usage() - Display the command line help text.
+#**************************************************************************
+usage(){
+    if [ "$1" ] ; then
+        echo "$1"
+        echo ""
+    fi
+    cat<<EOHELP
+Usage:  `basename $0` [OPTIONS] [INPUT]
+Converts a CSV file to a CSV file. This is useful for changing the CSV
+format or replacing newlines.
+Options:
+    -c <LIST>   Output the columns specified by LIST. The list should
+                contain the column numbers to output, starting from 1,
+                separated by commas. Ranges are not allowed. Overrides -n.
+    -e <ESCAPE> The input CSV escape character. Defaults to $CSV_ESCAPE.
+    -E <ESCAPE> The output CSV escape character. Defaults to $OCSV_ESCAPE.
+    -h          This text.
+    -l <LEVEL>  Quote level for output. Defaults to 0.
+               -1 = Do not quote any fields. Use with caution.
+                0 = Only strings that require it are quoted.
+                1 = All non-number fields are quoted. -?[0-9.]
+                2 = All fields are quoted except empty ones.
+                3 = All fields are quoted including empty ones.
+    -N <TEXT>   Replace embedded newlines with TEXT. Defaults to a newline.
+    -n <NUMBER> Output exactly NUMBER of columns. If a row has more columns
+                the extra will be removed and if it has fewer extra blank
+                columns will be added. Ignored when -c is used.
+    -o <FILE>   Write the results to FILE.
+    -q <QUOTE>  The input CSV quote character. Defaults to $CSV_ESCAPE.
+    -Q <QUOTE>  The output CSV quote character. Defaults to $OCSV_ESCAPE.
+    -r <NUM>    Skip NUM rows of the CSV file or input.
+    -s <SEP>    The input CSV field separator. Defaults to $CSV_SEPARATOR.
+    -S <SEP>    The output CSV field separator. Defaults to $OCSV_SEPARATOR.
+    -T <TEXT>   Replace embedded tabs with TEXT. Defaults to a tab.
+
+Replacement for -N and -T are not checked for the output escape character.
+EOHELP
+    exit 1
+}
+
+#**************************************************************************
+# Check and handle commandline options.
+#**************************************************************************
+while [ "$#" -gt 0 ] ; do
+    case "$1" in
+        # Output column list.
+        -c) [ "$2" ] && COL_LIST="$2"    || usage "$1 requires an argument."
+            shift 2;;
+        # Input CSV escape character.
+        -e) [ "$2" ] && CSV_ESCAPE="$2"  || usage "$1 requires an argument."
+            shift 2;;
+        # Output CSV escape character.
+        -E) [ "$2" ] && OCSV_ESCAPE="$2" || usage "$1 requires an argument."
+            shift 2;;
+        # Print the help text.
+        -h) usage;;
+        # Quote level.
+        -l) [ "$2" ] && QUOTE_LEVEL="$2" || usage "$1 requires an argument."
+            shift 2;;
+        # Newline replacement text.
+        -N) [ "$2" ] && NL_TEXT="$2"     || usage "$1 requires an argument."
+            shift 2;;
+        # The number of columns to output.
+        -n) [ "$2" ] && NUM_COLS="$2"    || usage "$1 requires an argument."
+            shift 2;;
+        # Output to a file.
+        -o) [ "$2" ] && OUTPUT="$2"      || usage "$1 requires an argument."
+            shift 2;;
+        # Input CSV quote character.
+        -q) [ "$2" ] && CSV_QUOTE="$2"   || usage "$1 requires an argument."
+            shift 2;;
+        # Output CSV quote character.
+        -Q) [ "$2" ] && OCSV_QUOTE="$2"  || usage "$1 requires an argument."
+            shift 2;;
+        # Rows to skip
+        -r) [ "$2" ] && SKIP_ROWS="$2"   || usage "$1 requires an argument."
+            shift 2;;
+        # Input CSV separator character.
+        -s) [ "$2" ] && CSV_SEPARATOR="$2"     || usage "$1 requires an argument."
+            shift 2;;
+        # Output CSV separator character.
+        -S) [ "$2" ] && OCSV_SEPARATOR="$2"    || usage "$1 requires an argument."
+            shift 2;;
+        # Tab replacement text.
+        -T) [ "$2" ] && TAB_TEXT="$2"    || usage "$1 requires an argument."
+            shift 2;;
+        # Mawk bug.
+        -z) CSV_MAWK_BUG="Y"; shift;;
+        # Strangely named files.
+        --) [ "$2" ] && FILE="$2"; break;;
+        # Read from STDIN.
+        -)  FILE="-"; shift;;
+        # Catch invalid options.
+        -*) usage "Invalid option $1";;
+        # Anything else should be a file.
+        *)  FILE="$1"; shift;;
+    esac
+done
+
+# Check the file.
+[ "X$FILE" != "X-" -a ! -f "$FILE" -a ! -r "$FILE" ] &&
+    usage "Unable to read the file ($FILE)."
+
+if [ "$OUTPUT" ] ; then
+    exec 1>$OUTPUT
+fi
+
+#**************************************************************************
+# Perform the actual conversion.
+# The heart is the function parse_csv.
+# See http://lorance.freeshell.org/csv/ for more information.
+#**************************************************************************
+awk -v csv_sep="$CSV_SEPARATOR" \
+    -v csv_quote="$CSV_QUOTE" \
+    -v csv_escape="$CSV_ESCAPE" \
+    -v ocsv_sep="$OCSV_SEPARATOR" \
+    -v ocsv_quote="$OCSV_QUOTE" \
+    -v ocsv_escape="$OCSV_ESCAPE" \
+    -v col_list="$COL_LIST" \
+    -v quotelevel="$QUOTE_LEVEL" \
+    -v nltext="$NL_TEXT" \
+    -v numcols="$NUM_COLS" \
+    -v row_attr="$ROW_ATTR" \
+    -v skip="$SKIP_ROWS" \
+    -v tabtext="$TAB_TEXT" \
+    -v csv_mawk_bug="$CSV_MAWK_BUG" \
+'function parse_csv(string,csv,sep,quote,escape,newline,fields,instr,pos,strtrim) {
+    # Make sure there is something to parse.
+    if (length(string) == 0) return 0;
+    string = sep string; # The code bellow always assumes ,FIELD.
+    fields = 0; # The number of fields found thus far.
+    while (length(string) > 0) {
+        strtrim = 0; # Used to trim quotes off strings.
+        # Handle a quoted field.
+        if (substr(string,2,1) == quote) {
+            instr = 1; pos = 2; strtrim = 1;
+            do {
+                pos++
+                if (pos != length(string) &&
+                    substr(string,pos,1) == escape &&
+                    (substr(string,pos + 1,1) == quote ||
+                     substr(string,pos + 1,1) == escape)) {
+                    # Remove escaped quote characters.
+                    string = substr(string,1,pos - 1) substr(string,pos + 1);
+                } else if (substr(string,pos,1) == quote) {
+                    # Found the end of the string.
+                    instr = 0;
+                } else if (newline && pos >= length(string)) {
+                    # Handle embedded newlines if requested.
+                    if (getline == -1) {
+                        csverr = "Unable to read the next line.";
+                        return -1;
+                    }
+                    string = string newline $0;
+                }
+            } while (pos < length(string) && instr)
+            if (instr) {
+                csverr = "Missing end quote.";
+                return -1;
+            }
+        } else {
+            # Handle an empty field.
+            if (length(string) == 1 || substr(string,2,1) == sep) {
+                csv[fields] = "";
+                fields++;
+                if (length(string) == 1)
+                    return fields;
+                string = substr(string,2);
+                continue;
+            }
+            # Search for a separator.
+            pos = index(substr(string,2),sep);
+            # If there is no separator the rest of the string is a field.
+            if (pos == 0) {
+                csv[fields] = substr(string,2);
+                fields++;
+                return fields;
+            }
+        }
+        if ((pos != length(string) && substr(string,pos + 1,1) != sep)) {
+            csverr = "Missing separator.";
+            return -1;
+        }
+        # Gather the field.
+        csv[fields] = substr(string,2 + strtrim,pos - (1 + strtrim * 2));
+        fields++;
+        # Remove the field from the string for the next pass.
+        string = substr(string,pos + 1);
+    }
+    return fields; }
+
+# Process each line of CSV data.
+BEGIN {
+    if (ocsv_escape == "\\")
+        escapere = "\\\\"
+    else
+        escapere = ocsv_escape
+    # Split the column list into an array.
+    if (col_list) cols_count = split(col_list,cols,/,/)
+}
+{   line++ # The current line number
+    # Parse the line.
+    fields = parse_csv($0,csv,csv_sep,csv_quote,csv_escape,"\n");
+    # Check for errors.
+    if (fields < 0 ) {
+        print "ERROR: " csverr " at line # "line | "cat 1>&2";
+        next;
+    }
+    # Skip rows if requested.
+    if (line <= skip) next;
+    # Make sure the right number of columns are output.
+    if (numcols){
+        if (fields < numcols) {
+            # Blank out the extra fields.
+            for (col = fields; col < numcols; col++)
+                csv[col] = ""
+        }
+        fields = numcols;
+    }
+    # Output columns list.
+    if (col_list) {
+        for (col = 0; col < fields; col++)
+            old[col] = csv[col]
+        for (col = 0; col < cols_count; col++) {
+            field = cols[col + 1] - 1
+            if (field > fields - 1) old[field] = ""
+            csv[col] = old[field]
+        }
+        fields = cols_count
+    }
+    # Output the row.
+    for (col = 0; col < fields; col++) {
+        if (length(csv[col]) != 0) {
+            if (((csv[col] ~ ocsv_sep) || \
+                 (csv[col] ~ escapere) || \
+                 (csv[col] ~ ocsv_quote) || \
+                 (csv[col] ~ /\n/) || \
+                 (csv[col] ~ /\t/) || \
+                 (quotelevel >= 2) || \
+                 ((quotelevel == 1) && \
+                  (csv[col] !~ /^-*[0-9.][0-9.]*$/))) && \
+                (quotelevel != -1)) {
+                if (csv_mawk_bug && ocsv_escape == "\\")
+                    gsub (escapere,"\\\\\\",csv[col])
+                else
+                    gsub (escapere,ocsv_escape ocsv_escape,csv[col])
+                if (ocsv_escape != ocsv_quote)
+                    gsub (ocsv_quote,ocsv_escape ocsv_quote,csv[col]);
+                if (nltext) gsub (/\n/,nltext,csv[col]);
+                if (tabtext) gsub (/\t/,tabtext,csv[col]);
+                printf "%s%s%s", ocsv_quote, csv[col], ocsv_quote
+            } else
+                printf "%s", csv[col]
+        } else if (quotelevel == 3)
+            printf "%s%s", ocsv_quote, ocsv_quote
+        if (col < fields - 1) printf "%s", ocsv_sep
+    }
+    printf "\n"
+}' $FILE 

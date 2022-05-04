@@ -1,0 +1,36 @@
+CSV Conversion Utilities.
+By LoranceStinson+csv@gmail.com
+Based on my AWK CSV parsing function.
+See http://lorance.freeshell.org/csvutils/ for information
+
+These are utilities for converting CSV files to different formats. Included are:
+    csv2csv   - Converts between different formats of CSV. Can also rearrange 
+                columns and perform other changes.
+    csv2html  - Converts to HTML with a high level of flexibility.
+    csv2sc    - Converts to the format used by the sc spreadsheet calculator.
+                This is VERY experimental and should be used with caution.
+    csv2sql   - Converts to basic SQL.
+
+Backslashes:
+    These are all shell scripts that call an embedded AWK script. This makes it
+    very important that the backslash character be properly escaped when passed
+    on the command line. If you do not get the results you expected with a
+    backslash character try doubling what you have.
+
+Defaults:
+    Someone asked in Usenet about default values for the escape, quote and
+    separator characters. I have changed the scripts to use the value of the
+    environment variables CSV_ESCAPE, CSV_QUOTE and CSV_SEPARATOR respectively
+    as the default if they are set. This will change the default value for
+    reading and writing CSV files along with the help text.
+
+Note on Mawk:
+    There seems to be a bug in Mawk with regards to backslash characters. The
+    function gsub is used to escape special characters, like the quote and
+    escape characters. When the escape character is a backslash and Mawk is
+    used only one backslash is output instead of the required two. The hidden
+    command line option -z will correct for this. Only use -z if you are using
+    Mawk, it will cause other AWKs to output three backslash characters.
+    Setting the environment variable CSV_MAWK_BUG to a true value will do the
+    same thing.
+

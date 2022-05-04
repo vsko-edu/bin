@@ -1,0 +1,107 @@
+This is a test CSV file.;;;;
+It contains;'quotedTABtext';and;numbers 1234;5678
+It also has;quoted text with an embedded quote"<- right there;;;
+'The strange characters \\ and \' are handled correctly.';;;;
+The HTML entities like <, > & " are handled correctly.;;;;
+'There is a newline here ->NL<- and it should be processed correctly.';;;;
+
+"It contains","quotedTABtext","and","numbers 1234","5678"
+"It also has","quoted text with an embedded quote""<- right there","","",""
+"The strange characters \ and ' are handled correctly.","","","",""
+"The HTML entities like <, > & "" are handled correctly.","","","",""
+"There is a newline here ->NL<- and it should be processed correctly.","","","",""
+
+<TABLE>
+<TR>
+<TD>This is a test CSV file.</TD>
+</TR>
+<TR>
+<TD>It contains</TD>
+<TD>quoted	text</TD>
+<TD>and</TD>
+<TD>numbers 1234</TD>
+<TD>5678</TD>
+</TR>
+<TR>
+<TD>It also has</TD>
+<TD>quoted text with an embedded quote&quot;&lt;- right there</TD>
+</TR>
+<TR>
+<TD>The strange characters \ and ' are handled correctly.</TD>
+</TR>
+<TR>
+<TD>The HTML entities like &lt;, &gt; &amp; &quot; are handled correctly.</TD>
+</TR>
+<TR>
+<TD>There is a newline here -&gt;<BR>&lt;- and it should be processed correctly.</TD>
+</TR>
+</TABLE>
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+<HEAD>
+<TITLE>This is the HTML title</TITLE>
+</HEAD>
+<BODY>
+<TABLE border="0" algn="center">
+	<TR valign="middle">
+		<TH nowrap><B><FONT face="Arial">It contains</FONT></B></TH>
+		<TH nowrap><B><FONT face="Arial">quoted	text</FONT></B></TH>
+		<TH nowrap><B><FONT face="Arial">and</FONT></B></TH>
+		<TH nowrap><B><FONT face="Arial">numbers 1234</FONT></B></TH>
+		<TH nowrap><B><FONT face="Arial">5678</FONT></B></TH>
+	</TR>
+	<TR valign="middle">
+		<TD align="left" nowrap><FONT face="Arial">It also has</FONT></TD>
+		<TD align="left" nowrap><FONT face="Arial">quoted text with an embedded quote&quot;&lt;- right there</FONT></TD>
+		<TD align="left" nowrap><FONT face="Arial">SPACE</FONT></TD>
+		<TD align="left" nowrap><FONT face="Arial">SPACE</FONT></TD>
+		<TD align="left" nowrap><FONT face="Arial">SPACE</FONT></TD>
+	</TR>
+	<TR valign="middle">
+		<TD align="left" nowrap><FONT face="Arial">The strange characters \ and ' are handled correctly.</FONT></TD>
+		<TD align="left" nowrap><FONT face="Arial">SPACE</FONT></TD>
+		<TD align="left" nowrap><FONT face="Arial">SPACE</FONT></TD>
+		<TD align="left" nowrap><FONT face="Arial">SPACE</FONT></TD>
+		<TD align="left" nowrap><FONT face="Arial">SPACE</FONT></TD>
+	</TR>
+	<TR valign="middle">
+		<TD align="left" nowrap><FONT face="Arial">The HTML entities like &lt;, &gt; &amp; &quot; are handled correctly.</FONT></TD>
+		<TD align="left" nowrap><FONT face="Arial">SPACE</FONT></TD>
+		<TD align="left" nowrap><FONT face="Arial">SPACE</FONT></TD>
+		<TD align="left" nowrap><FONT face="Arial">SPACE</FONT></TD>
+		<TD align="left" nowrap><FONT face="Arial">SPACE</FONT></TD>
+	</TR>
+	<TR valign="middle">
+		<TD align="left" nowrap><FONT face="Arial">There is a newline here -&gt;NL&lt;- and it should be processed correctly.</FONT></TD>
+		<TD align="left" nowrap><FONT face="Arial">SPACE</FONT></TD>
+		<TD align="left" nowrap><FONT face="Arial">SPACE</FONT></TD>
+		<TD align="left" nowrap><FONT face="Arial">SPACE</FONT></TD>
+		<TD align="left" nowrap><FONT face="Arial">SPACE</FONT></TD>
+	</TR>
+</TABLE>
+</BODY>
+</HTML>
+
+# This data file was generated for the Spreadsheet Calculator.
+# You almost certainly should not edit it.
+
+leftstring A0 = "This is a test CSV file."
+leftstring A1 = "It contains"
+leftstring B1 = "quoted TAB text"
+leftstring C1 = "and"
+leftstring D1 = "numbers 1234"
+let E1 = 5678
+leftstring A2 = "It also has"
+leftstring B2 = "quoted text with an embedded quote\"<- right there"
+leftstring A3 = "The strange characters \ and ' are handled correctly."
+leftstring A4 = "The HTML entities like <, > & \" are handled correctly."
+leftstring A5 = "There is a newline here -> NL <- and it should be processed correctly."
+
+insert into table values ('This is a test CSV file.');
+insert into table values ('It contains','quoted TAB text','and','numbers 1234',5678);
+insert into table values ('It also has','quoted text with an embedded quote"<- right there');
+insert into table values ('The strange characters \\ and \' are handled correctly.');
+insert into table values ('The HTML entities like <, > & " are handled correctly.');
+insert into table values ('There is a newline here -> NL <- and it should be processed correctly.');
+

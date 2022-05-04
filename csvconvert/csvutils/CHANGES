@@ -1,0 +1,8 @@
+2007-02-28
+    * Now properly handles a newline right after a quote character.
+
+2007-10-05
+    * Added checking for default for escape, quote and separator characters.
+
+    * Removed attempted doubling of \ character when used as an escape
+      character. This could cause confusion and was not a good idea.

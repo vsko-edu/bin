@@ -1,0 +1,7 @@
+This is a test CSV file.
+It contains,"quoted	text",and,numbers 1234,5678
+It also has,"quoted text with an embedded quote""<- right there"
+"The strange characters \ and ' are handled correctly."
+"The HTML entities like <, > & "" are handled correctly."
+"There is a newline here ->
+<- and it should be processed correctly."

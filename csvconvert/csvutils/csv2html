@@ -1,0 +1,317 @@
+#!/bin/sh
+#
+# This file is in the public domain.
+#
+# For more information email LoranceStinson+csv@gmail.com.
+# Or see http://lorance.freeshell.org/csvutils/
+
+#**************************************************************************
+# Defaults.
+#**************************************************************************
+CSV_ESCAPE=${CSV_ESCAPE:='"'}
+CSV_SEPARATOR=${CSV_SEPARATOR:=","}
+CSV_QUOTE=${CSV_QUOTE:='"'}
+FILE="-"
+EMPTY_FILLER="&nbsp;"
+INDENT_TEXT='    '
+NL_TEXT="<BR>"
+NUM_COLS=""
+OUTPUT=""
+SKIP_ROWS="0"
+HTML_TITLE="HTML from CSV"
+
+#**************************************************************************
+# usage() - Display the command line help text.
+#**************************************************************************
+usage(){
+    if [ "$1" ] ; then
+        echo "$1"
+        echo ""
+    fi
+    cat<<EOHELP
+Usage:  `basename $0` [OPTIONS] [INPUT]
+Converts a CSV file into an HTML table. Reads from STDIN by default.
+Options:
+    -A          Set the alignment for each cell based on it's contents.
+                Cells containing numbers /-?[0-9.]/ are aligned right, all
+                others are aligned left. Empty cells have no alignment set.
+                Does not apply to the first row if -H is used.
+    -b          Wrap header cells in bold tags if -H is used.
+    -c <TEXT>   Use TEXT as a template for each cell. TEXT is passed to
+                sprintf with the cell data as sprintf(TEXT,DATA). See awk(1)
+                for information. Affects -H. Does not affect -A.
+    -C <ATTR>   Add extra attributes to each cell <TD> tag.
+                Applies to the first row even if -H is used.
+    -e <ESCAPE> The CSV escape character. Defaults to $CSV_ESCAPE.
+    -E <TEXT>   Fill text for -F. Defaults to $EMPTY_FILLER.
+    -f          Output full HTML. By default on the table HTML is output.
+    -F          Fill empty cells. Applied before -A.
+    -h          This text.
+    -H          Make the first row a header row using <TH> tags.
+    -i          Indent the HTML.
+    -I <TEXT>   Use TEXT to indent the HTML. Defaults to four spaces.
+    -N <TEXT>   Replace embedded newlines with TEXT. Defaults to $NL_TEXT.
+    -n <NUMBER> Output exactly NUMBER of columns. If a row has more columns
+                the extra will be removed and if it has fewer extra blank
+                columns will be added.
+    -o <FILE>   Write the results to FILE.
+    -q <QUOTE>  The CSV quote character. Defaults to $CSV_QUOTE.
+    -r <NUM>    Skip NUM rows of the CSV file or input.
+    -R <ATTR>   Add extra attributes to each row <TR> tag.
+                Applies to the first row even if -H is used.
+    -s <SEP>    The CSV field separator. Defaults to $CSV_SEPARATOR.
+    -t <TEXT>   Use TEXT as the title when generating full HTML.
+    -T <ATTR>   Add extra attributes to the <TABLE> tag.
+
+-C, -R and -T must be valid HTML.
+EOHELP
+    exit 1
+}
+
+#**************************************************************************
+# Check and handle commandline options.
+#**************************************************************************
+while [ "$#" -gt 0 ] ; do
+    case "$1" in
+        # Auto alignment.
+        -A) AUTO_ALIGN="Y"; shift;;
+        # Auto alignment.
+        -b) BOLD_HEADER="Y"; shift;;
+        # Cell template.
+        -c) [ "$2" ] && CELL_TEMPL="$2"  || usage "$1 requires an argument."
+            shift 2;;
+        # Cell attributes.
+        -C) [ "$2" ] && CELL_ATTR="$2"   || usage "$1 requires an argument."
+            shift 2;;
+        # CSV escape character.
+        -e) [ "$2" ] && CSV_ESCAPE="$2"  || usage "$1 requires an argument."
+            shift 2;;
+        # Empty cell fill text.
+        -E) [ "$2" ] && EMPTY_FILLER="$2"  || usage "$1 requires an argument."
+            shift 2;;
+        # Output full HTML.
+        -f) FULL_HTML="Y"; shift;;
+        # Fill empty cells.
+        -F) FILL_EMPTY="Y"; shift;;
+        # Print the help text.
+        -h) usage;;
+        # Make the first row a header row.
+        -H) HEADER="Y"; shift;;
+        # Indent the HTML.
+        -i) INDENT="Y"; shift;;
+        # The text to indent with.
+        -I) [ "$2" ] && INDENT_TEXT="$2" || usage "$1 requires an argument."
+            shift 2;;
+        # Newline replacement text.
+        -N) [ "$2" ] && NL_TEXT="$2"     || usage "$1 requires an argument."
+            shift 2;;
+        # The number of columns to output.
+        -n) [ "$2" ] && NUM_COLS="$2"    || usage "$1 requires an argument."
+            shift 2;;
+        # Output to a file.
+        -o) [ "$2" ] && OUTPUT="$2"      || usage "$1 requires an argument."
+            shift 2;;
+        # CSV quote character.
+        -q) [ "$2" ] && CSV_QUOTE="$2"   || usage "$1 requires an argument."
+            shift 2;;
+        # Rows to skip
+        -r) [ "$2" ] && SKIP_ROWS="$2"   || usage "$1 requires an argument."
+            shift 2;;
+        # Row attributes.
+        -R) [ "$2" ] && ROW_ATTR="$2"    || usage "$1 requires an argument."
+            shift 2;;
+        # CSV separator character.
+        -s) [ "$2" ] && CSV_SEPARATOR="$2"     || usage "$1 requires an argument."
+            shift 2;;
+        # The title for full HTML.
+        -t) [ "$2" ] && HTML_TITLE="$2"  || usage "$1 requires an argument."
+            shift 2;;
+        # Table attributes.
+        -T) [ "$2" ] && TABLE_ATTR="$2"  || usage "$1 requires an argument."
+            shift 2;;
+        # Mawk bug.
+        -z) CSV_MAWK_BUG="Y"; shift;;
+        # Strangely named files.
+        --) [ "$2" ] && FILE="$2"; break;;
+        # Read from STDIN.
+        -)  FILE="-"; shift;;
+        # Catch invalid options.
+        -*) usage "Invalid option $1";;
+        # Anything else should be a file.
+        *)  FILE="$1"; shift;;
+    esac
+done
+
+# Check the file.
+[ "X$FILE" != "X-" -a ! -f "$FILE" -a ! -r "$FILE" ] &&
+    usage "Unable to read the file ($FILE)."
+
+# Send output to a file if requested.
+if [ "$OUTPUT" ] ; then
+    exec 1>$OUTPUT
+fi
+
+#**************************************************************************
+# Perform the actual conversion.
+# The heart is the function parse_csv.
+# See http://lorance.freeshell.org/csv/ for more information.
+#**************************************************************************
+awk -v auto_align="$AUTO_ALIGN" \
+    -v bold_header="$BOLD_HEADER" \
+    -v cell_attr="$CELL_ATTR" \
+    -v cell_templ="$CELL_TEMPL" \
+    -v csv_sep="$CSV_SEPARATOR" \
+    -v csv_quote="$CSV_QUOTE" \
+    -v csv_escape="$CSV_ESCAPE" \
+    -v empty_filler="$EMPTY_FILLER" \
+    -v fill_empty="$FILL_EMPTY" \
+    -v full_html="$FULL_HTML" \
+    -v header="$HEADER" \
+    -v indent="$INDENT" \
+    -v indent_text="$INDENT_TEXT" \
+    -v nltext="$NL_TEXT" \
+    -v numcols="$NUM_COLS" \
+    -v row_attr="$ROW_ATTR" \
+    -v skip="$SKIP_ROWS" \
+    -v table_attr="$TABLE_ATTR" \
+    -v html_title="$HTML_TITLE" \
+'function parse_csv(string,csv,sep,quote,escape,newline,fields,instr,pos,strtrim) {
+    # Make sure there is something to parse.
+    if (length(string) == 0) return 0;
+    string = sep string; # The code bellow always assumes ,FIELD.
+    fields = 0; # The number of fields found thus far.
+    while (length(string) > 0) {
+        strtrim = 0; # Used to trim quotes off strings.
+        # Handle a quoted field.
+        if (substr(string,2,1) == quote) {
+            instr = 1; pos = 2; strtrim = 1;
+            do {
+                pos++
+                if (pos != length(string) &&
+                    substr(string,pos,1) == escape &&
+                    (substr(string,pos + 1,1) == quote ||
+                     substr(string,pos + 1,1) == escape)) {
+                    # Remove escaped quote characters.
+                    string = substr(string,1,pos - 1) substr(string,pos + 1);
+                } else if (substr(string,pos,1) == quote) {
+                    # Found the end of the string.
+                    instr = 0;
+                } else if (newline && pos >= length(string)) {
+                    # Handle embedded newlines if requested.
+                    if (getline == -1) {
+                        csverr = "Unable to read the next line.";
+                        return -1;
+                    }
+                    string = string newline $0;
+                }
+            } while (pos < length(string) && instr)
+            if (instr) {
+                csverr = "Missing end quote.";
+                return -1;
+            }
+        } else {
+            # Handle an empty field.
+            if (length(string) == 1 || substr(string,2,1) == sep) {
+                csv[fields] = "";
+                fields++;
+                if (length(string) == 1)
+                    return fields;
+                string = substr(string,2);
+                continue;
+            }
+            # Search for a separator.
+            pos = index(substr(string,2),sep);
+            # If there is no separator the rest of the string is a field.
+            if (pos == 0) {
+                csv[fields] = substr(string,2);
+                fields++;
+                return fields;
+            }
+        }
+        if ((pos != length(string) && substr(string,pos + 1,1) != sep)) {
+            csverr = "Missing separator.";
+            return -1;
+        }
+        # Gather the field.
+        csv[fields] = substr(string,2 + strtrim,pos - (1 + strtrim * 2));
+        fields++;
+        # Remove the field from the string for the next pass.
+        string = substr(string,pos + 1);
+    }
+    return fields; }
+
+BEGIN {
+    # Print the HTML header if requested.
+    if (full_html == "Y") {
+        print "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01 Transitional//EN\">"
+        print "<HTML>"
+        print "<HEAD>"
+        printf "<TITLE>%s</TITLE>\n", html_title
+        print "</HEAD>"
+        print "<BODY>"
+    }
+    if (table_attr) table_attr = " " table_attr
+    printf "<TABLE%s>\n", table_attr
+    if (row_attr) row_attr = " " row_attr
+    if (cell_attr) cell_attr = " " cell_attr
+}
+
+# Process each line of CSV data.
+{   line++ # The current line number
+    # Parse the line.
+    fields = parse_csv($0,csv,csv_sep,csv_quote,csv_escape,"\n");
+    # Check for errors.
+    if (fields < 0 ) {
+        print "ERROR: " csverr " at line # "line | "cat 1>&2";
+        next;
+    }
+    # Skip rows if requested.
+    if (line <= skip) next;
+    # Make sure the right number of columns are output.
+    if (numcols){
+        if (fields < numcols) {
+            # Blank out the extra fields.
+            for (col = fields; col < numcols; col++)
+                csv[col] = ""
+        }
+        fields = numcols;
+    }
+    # Output the row.
+    if (indent == "Y") printf "%s", indent_text
+    printf "<TR%s>\n", row_attr
+    for (col = 0; col < fields; col++) {
+        if (indent) printf "%s%s", indent_text, indent_text
+        # Replace special characters with their HTML entities.
+        if (csv[col]) {
+            gsub ("&","\\&amp;",csv[col]);
+            gsub ("<","\\&lt;",csv[col]);
+            gsub (">","\\&gt;",csv[col]);
+            gsub ("\"","\\&quot;",csv[col]);
+            gsub ("\n",nltext,csv[col]);
+        } else if (fill_empty == "Y")
+            csv[col] = empty_filler
+        if (cell_templ)
+            cell = sprintf(cell_templ, csv[col])
+        else
+            cell = csv[col]
+        if (header == "Y" && line == skip + 1) {
+            if (bold_header == "Y") cell = "<B>" cell "</B>"
+            printf "<TH%s>%s</TH>\n", cell_attr, cell
+        } else if (auto_align) {
+            align="" # Default to no aligment.
+            if (csv[col] ~ /^-?[0-9.][0-9.]*$/) align=" align=\"right\""
+            else if (csv[col]) align=" align=\"left\""
+            printf "<TD%s%s>%s</TD>\n", align, cell_attr, cell
+        } else
+            printf "<TD%s>%s</TD>\n", cell_attr, cell
+    }
+    if (indent) printf "%s", indent_text
+    print "</TR>"
+}
+END {
+    print "</TABLE>"
+    if (full_html == "Y") {
+        print "</BODY>"
+        print "</HTML>"
+    }
+}' $FILE
